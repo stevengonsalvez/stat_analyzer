@@ -1,0 +1,177 @@
+
+Dim wName As String
+Dim statWb As Workbook
+
+Dim dlgOpen As FileDialog
+Set dlgOpen = Application.FileDialog(msoFileDialogFilePicker)
+
+With dlgOpen
+    .AllowMultiSelect = False
+    ''Start in
+    .InitialFileName = "C:\stat analysis\"
+    .Show
+End With
+
+For Each fname In dlgOpen.SelectedItems
+
+Application.ScreenUpdating = False
+wName = "temp_processing"
+
+
+newWorkbook (wName)
+Set statWb = Workbooks.Open(wName)
+
+
+Set ws = Worksheets.Add(After:=Worksheets(1))
+ws.Name = "temp"
+
+With ws.QueryTables.Add( _
+        Connection:="TEXT;" & fname, _
+        Destination:=Range("A1"))
+    .Name = "temp"
+    .FieldNames = True
+    .RowNumbers = False
+    .FillAdjacentFormulas = False
+    .PreserveFormatting = True
+    .RefreshOnFileOpen = False
+    .BackgroundQuery = True
+    .RefreshStyle = xlInsertDeleteCells
+    .SavePassword = False
+    .SaveData = True
+    .AdjustColumnWidth = True
+    .TextFilePromptOnRefresh = False
+    .TextFilePlatform = xlMacintosh
+    .TextFileStartRow = 1
+    .TextFileParseType = xlDelimited
+    .TextFileTextQualifier = xlTextQualifierDoubleQuote
+    .TextFileConsecutiveDelimiter = False
+    .TextFileTabDelimiter = False
+    .TextFileSemicolonDelimiter = False
+    .TextFileCommaDelimiter = True
+    .TextFileSpaceDelimiter = False
+    .Refresh BackgroundQuery:=False
+    '.UseListObject = False
+End With
+
+
+Cells.Select
+    Range("B1").Activate
+    ActiveWorkbook.Worksheets("temp").Sort.SortFields.Clear
+    ActiveWorkbook.Worksheets("temp").Sort.SortFields.Add Key:=Range("H2:H" & Range("H" & Rows.Count).End(xlUp).Row) _
+        , SortOn:=xlSortOnValues, Order:=xlAscending, DataOption:=xlSortNormal
+    With ActiveWorkbook.Worksheets("temp").Sort
+        .SetRange Range("A1:Y" & Range("H" & Rows.Count).End(xlUp).Row)
+        .Header = xlYes
+        .MatchCase = False
+        .Orientation = xlTopToBottom
+        .SortMethod = xlPinYin
+        .Apply
+ End With
+ 
+Set ws = Worksheets.Add(After:=Worksheets(1))
+ws.Name = "unique"
+
+
+    Dim My_Range As Range
+    Dim FieldNum As Long
+    Dim CalcMode As Long
+    Dim ViewMode As Long
+    Dim ws2 As Worksheet
+    Dim Lrow As Long
+    Dim cell As Range
+    Dim CCount As Long
+    Dim WSNew As Worksheet
+    Dim ErrNum As Long
+    FieldNum = 1
+    
+    Set ws2 = Sheets("temp")
+    Application.EnableEvents = True
+
+  With ws2
+  
+        'first we copy the Unique data from the filter field to ws2
+        My_Range.Columns(FieldNum).AdvancedFilter _
+                Action:=xlFilterCopy, _
+                CopyToRange:=.Range("A1"), Unique:=True
+
+        'loop through the unique list in ws and filter/copy to a new sheet
+        Lrow = .Cells(Rows.Count, "A").End(xlUp).Row
+        For Each cell In .Range("A2:A" & Lrow)
+
+            'Filter the range
+            My_Range.AutoFilter Field:=FieldNum, Criteria1:="=" & _
+             Replace(Replace(Replace(cell.Value, "~", "~~"), "*", "~*"), "?", "~?")
+
+                'Add a new workbook
+                
+               ' Dim statWb As Workbook
+                Dim tempName As String
+                
+                
+                tempName = "stat_" & Format(Now, "yyyy-mm-dd") & Format(Now(), "hh_mm_ss") & cell.Value
+                newWorkbook (tempName)
+                Set statWb = Workbooks.Open(tempName)
+
+                
+                Set WSNew = Worksheets.Add(After:=Worksheets(1))
+                On Error Resume Next
+                WSNew.Name = cell.Value
+                If Err.Number > 0 Then
+                    ErrNum = ErrNum + 1
+                    WSNew.Name = "Error_" & Format(ErrNum, "0000")
+                    Err.Clear
+                End If
+                On Error GoTo 0
+
+                'Copy the visible data to the new worksheet
+                My_Range.SpecialCells(xlCellTypeVisible).Copy
+                With WSNew.Range("A1")
+                    ' Paste:=8 will copy the columnwidth in Excel 2000 and higher
+                    ' Remove this line if you use Excel 97
+                    .PasteSpecial Paste:=8
+                    .PasteSpecial xlPasteValues
+                    .PasteSpecial xlPasteFormats
+                    Application.CutCopyMode = False
+                    .Select
+              End With
+           
+
+            'Show all data in the range
+            My_Range.AutoFilter Field:=FieldNum
+
+        Next cell
+
+        'Delete the ws2 sheet
+        On Error Resume Next
+        Application.DisplayAlerts = False
+        .Delete
+        Application.DisplayAlerts = True
+        On Error GoTo 0
+
+    End With
+
+    'Turn off AutoFilter
+    My_Range.Parent.AutoFilterMode = False
+
+    If ErrNum > 0 Then
+        MsgBox "Rename every WorkSheet name that start with ""Error_"" manually" _
+             & vbNewLine & "There are characters in the name that are not allowed" _
+             & vbNewLine & "in a sheet name or the worksheet already exist."
+    End If
+
+    'Restore ScreenUpdating, Calculation, EnableEvents, ....
+    My_Range.Parent.Select
+    ActiveWindow.View = ViewMode
+    With Application
+        .ScreenUpdating = True
+        .EnableEvents = True
+        .Calculation = CalcMode
+    End With
+
+
+
+
+
+
+
+Next
